@@ -4,7 +4,7 @@ title: Generating Signed APK
 layout: docs
 category: Guides (Android)
 permalink: docs/signed-apk-android.html
-next: activityindicatorios
+next: android-ui-performance
 ---
 
 To distribute your Android application via [Google Play store](https://play.google.com/store), you'll need to generate a signed release APK. The [Signing Your Applications](https://developer.android.com/tools/publishing/app-signing.html) page on Android Developers documentation describes the topic in detail. This guide covers the process in brief, as well as lists the steps required to packaging the JavaScript bundle.
@@ -35,13 +35,13 @@ MYAPP_RELEASE_KEY_PASSWORD=*****
 
 These are going to be global gradle variables, which we can later use in our gradle config to sign our app.
 
-_Note: Once you publish the app on the Play Store, you will need to republish your app under a different package name (loosing all downloads and ratings) if you want to change the signing key at any point. So backup your keystore and don't forget the passwords._
+_Note: Once you publish the app on the Play Store, you will need to republish your app under a different package name (losing all downloads and ratings) if you want to change the signing key at any point. So backup your keystore and don't forget the passwords._
 
 ### Adding signing config to your app's gradle config
 
 Edit the file `android/app/build.gradle` in your project folder and add the signing config,
 
-```
+```gradle
 ...
 android {
     ...
@@ -66,14 +66,13 @@ android {
 
 ### Generating the release APK
 
-1. Start the packager by running `npm start` in your project folder
-2. In your project folder, run the following in a Terminal,
+Simply run the following in a terminal:
 
 ```sh
-$ mkdir -p android/app/src/main/assets
-$ curl "http://localhost:8081/index.android.bundle?platform=android&dev=false&minify=true" -o "android/app/src/main/assets/index.android.bundle"
 $ cd android && ./gradlew assembleRelease
 ```
+
+Gradle's `assembleRelease` will bundle all the JavaScript needed to run your app into the APK. If you need to change the way the JavaScript bundle and/or drawable resources are bundled (e.g. if you changed the default file/folder names or the general structure of the project), have a look at `android/app/build.gradle` to see how you can update it to reflect these changes.
 
 The generated APK can be found under `android/app/build/outputs/apk/app-release.apk`, and is ready to be distributed.
 
@@ -87,7 +86,7 @@ $ cd android && ./gradlew installRelease
 
 Note that `installRelease` is only available if you've set up signing as described above.
 
-You can kill any running packager instances, all your and framework JavaScript code is bundled in the APK's assets. 
+You can kill any running packager instances, all your and framework JavaScript code is bundled in the APK's assets.
 
 ### Enabling Proguard to reduce the size of the APK (optional)
 
@@ -95,18 +94,11 @@ Proguard is a tool that can slightly reduce the size of the APK. It does this by
 
 _**IMPORTANT**: Make sure to thoroughly test your app if you've enabled Proguard. Proguard often requires configuration specific to each native library you're using. See `app/proguard-rules.pro`._
 
-To enable Proguard, set `minifyEnabled` to `true`:
+To enable Proguard, edit `android/app/build.gradle`:
 
-```
-...
-android {
-    ...
-    buildTypes {
-        release {
-            ...
-            minifyEnabled true
-        }
-    }
-}
-...
+```gradle
+/**
+ * Run Proguard to shrink the Java bytecode in release builds.
+ */
+def enableProguardInReleaseBuilds = true
 ```

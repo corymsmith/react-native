@@ -11,12 +11,12 @@
 
 #import <MobileCoreServices/MobileCoreServices.h>
 
+#import "RCTUtils.h"
+
 @implementation RCTFileRequestHandler
 {
   NSOperationQueue *_fileQueue;
 }
-
-@synthesize methodQueue = _methodQueue;
 
 RCT_EXPORT_MODULE()
 
@@ -28,7 +28,9 @@ RCT_EXPORT_MODULE()
 
 - (BOOL)canHandleRequest:(NSURLRequest *)request
 {
-  return [request.URL.scheme caseInsensitiveCompare:@"file"] == NSOrderedSame;
+  return
+  [request.URL.scheme caseInsensitiveCompare:@"file"] == NSOrderedSame
+  && !RCTIsXCAssetURL(request.URL);
 }
 
 - (NSOperation *)sendRequest:(NSURLRequest *)request
@@ -40,14 +42,15 @@ RCT_EXPORT_MODULE()
     _fileQueue.maxConcurrentOperationCount = 4;
   }
 
+  __weak __block NSBlockOperation *weakOp;
   __block NSBlockOperation *op = [NSBlockOperation blockOperationWithBlock:^{
 
     // Get content length
     NSError *error = nil;
     NSFileManager *fileManager = [NSFileManager new];
-    NSDictionary *fileAttributes = [fileManager attributesOfItemAtPath:request.URL.path error:&error];
+    NSDictionary<NSString *, id> *fileAttributes = [fileManager attributesOfItemAtPath:request.URL.path error:&error];
     if (error) {
-      [delegate URLRequest:op didCompleteWithError:error];
+      [delegate URLRequest:weakOp didCompleteWithError:error];
       return;
     }
 
@@ -64,18 +67,19 @@ RCT_EXPORT_MODULE()
                                            expectedContentLength:[fileAttributes[NSFileSize] ?: @-1 integerValue]
                                                 textEncodingName:nil];
 
-    [delegate URLRequest:op didReceiveResponse:response];
+    [delegate URLRequest:weakOp didReceiveResponse:response];
 
     // Load data
     NSData *data = [NSData dataWithContentsOfURL:request.URL
                                          options:NSDataReadingMappedIfSafe
                                            error:&error];
     if (data) {
-      [delegate URLRequest:op didReceiveData:data];
+      [delegate URLRequest:weakOp didReceiveData:data];
     }
-    [delegate URLRequest:op didCompleteWithError:error];
+    [delegate URLRequest:weakOp didCompleteWithError:error];
   }];
 
+  weakOp = op;
   [_fileQueue addOperation:op];
   return op;
 }

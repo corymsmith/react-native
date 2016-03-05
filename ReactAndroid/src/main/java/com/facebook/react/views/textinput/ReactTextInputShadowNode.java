@@ -11,9 +11,8 @@ package com.facebook.react.views.textinput;
 
 import javax.annotation.Nullable;
 
-import android.text.Spanned;
+import android.text.Spannable;
 import android.util.TypedValue;
-import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
 
@@ -22,37 +21,29 @@ import com.facebook.csslayout.MeasureOutput;
 import com.facebook.csslayout.Spacing;
 import com.facebook.infer.annotation.Assertions;
 import com.facebook.react.common.annotations.VisibleForTesting;
-import com.facebook.react.uimanager.CatalystStylesDiffMap;
 import com.facebook.react.uimanager.PixelUtil;
-import com.facebook.react.uimanager.ReactProp;
 import com.facebook.react.uimanager.ThemedReactContext;
 import com.facebook.react.uimanager.UIViewOperationQueue;
 import com.facebook.react.uimanager.ViewDefaults;
-import com.facebook.react.uimanager.ViewProps;
+import com.facebook.react.uimanager.annotations.ReactProp;
 import com.facebook.react.views.text.ReactTextShadowNode;
+import com.facebook.react.views.text.ReactTextUpdate;
 
 @VisibleForTesting
 public class ReactTextInputShadowNode extends ReactTextShadowNode implements
     CSSNode.MeasureFunction {
 
-  private static final int MEASURE_SPEC = View.MeasureSpec.makeMeasureSpec(
-      ViewGroup.LayoutParams.WRAP_CONTENT,
-      View.MeasureSpec.UNSPECIFIED);
-
   private @Nullable EditText mEditText;
-  private int mFontSize;
   private @Nullable float[] mComputedPadding;
   private int mJsEventCount = UNSET;
-  private int mNumLines = UNSET;
 
   public ReactTextInputShadowNode() {
     super(false);
-    mFontSize = (int) Math.ceil(PixelUtil.toPixelFromSP(ViewDefaults.FONT_SIZE_SP));
     setMeasureFunction(this);
   }
 
   @Override
-  protected void setThemedContext(ThemedReactContext themedContext) {
+  public void setThemedContext(ThemedReactContext themedContext) {
     super.setThemedContext(themedContext);
 
     // TODO #7120264: cache this stuff better
@@ -68,28 +59,31 @@ public class ReactTextInputShadowNode extends ReactTextShadowNode implements
     setDefaultPadding(Spacing.TOP, mEditText.getPaddingTop());
     setDefaultPadding(Spacing.RIGHT, mEditText.getPaddingRight());
     setDefaultPadding(Spacing.BOTTOM, mEditText.getPaddingBottom());
-    mComputedPadding = spacingToFloatArray(getStylePadding());
+    mComputedPadding = spacingToFloatArray(getPadding());
   }
 
   @Override
-  public void measure(CSSNode node, float width, MeasureOutput measureOutput) {
+  public void measure(CSSNode node, float width, float height, MeasureOutput measureOutput) {
     // measure() should never be called before setThemedContext()
     EditText editText = Assertions.assertNotNull(mEditText);
 
     measureOutput.width = width;
-    editText.setTextSize(TypedValue.COMPLEX_UNIT_PX, mFontSize);
-    mComputedPadding = spacingToFloatArray(getStylePadding());
+    editText.setTextSize(
+        TypedValue.COMPLEX_UNIT_PX,
+        mFontSize == UNSET ?
+            (int) Math.ceil(PixelUtil.toPixelFromSP(ViewDefaults.FONT_SIZE_SP)) : mFontSize);
+    mComputedPadding = spacingToFloatArray(getPadding());
     editText.setPadding(
-        (int) Math.ceil(getStylePadding().get(Spacing.LEFT)),
-        (int) Math.ceil(getStylePadding().get(Spacing.TOP)),
-        (int) Math.ceil(getStylePadding().get(Spacing.RIGHT)),
-        (int) Math.ceil(getStylePadding().get(Spacing.BOTTOM)));
+        (int) Math.ceil(getPadding().get(Spacing.LEFT)),
+        (int) Math.ceil(getPadding().get(Spacing.TOP)),
+        (int) Math.ceil(getPadding().get(Spacing.RIGHT)),
+        (int) Math.ceil(getPadding().get(Spacing.BOTTOM)));
 
-    if (mNumLines != UNSET) {
-      editText.setLines(mNumLines);
+    if (mNumberOfLines != UNSET) {
+      editText.setLines(mNumberOfLines);
     }
 
-    editText.measure(MEASURE_SPEC, MEASURE_SPEC);
+    editText.measure(0 /* unspecified */, 0 /* unspecified */);
     measureOutput.height = editText.getMeasuredHeight();
   }
 
@@ -99,19 +93,9 @@ public class ReactTextInputShadowNode extends ReactTextShadowNode implements
     return;
   }
 
-  @ReactProp(name = ViewProps.FONT_SIZE, defaultFloat = ViewDefaults.FONT_SIZE_SP)
-  public void setFontSize(float fontSize) {
-    mFontSize = (int) Math.ceil(PixelUtil.toPixelFromSP(fontSize));
-  }
-
   @ReactProp(name = "mostRecentEventCount")
   public void setMostRecentEventCount(int mostRecentEventCount) {
     mJsEventCount = mostRecentEventCount;
-  }
-
-  @ReactProp(name = ViewProps.NUMBER_OF_LINES, defaultInt = UNSET)
-  public void setNumberOfLines(int numberOfLines) {
-    mNumLines = numberOfLines;
   }
 
   @Override
@@ -123,8 +107,9 @@ public class ReactTextInputShadowNode extends ReactTextShadowNode implements
     }
 
     if (mJsEventCount != UNSET) {
-      Spanned preparedSpannedText = fromTextCSSNode(this);
-      ReactTextUpdate reactTextUpdate = new ReactTextUpdate(preparedSpannedText, mJsEventCount);
+      Spannable preparedSpannableText = fromTextCSSNode(this);
+      ReactTextUpdate reactTextUpdate =
+          new ReactTextUpdate(preparedSpannableText, mJsEventCount, mContainsImages);
       uiViewOperationQueue.enqueueUpdateExtraData(getReactTag(), reactTextUpdate);
     }
   }
@@ -132,7 +117,7 @@ public class ReactTextInputShadowNode extends ReactTextShadowNode implements
   @Override
   public void setPadding(int spacingType, float padding) {
     super.setPadding(spacingType, padding);
-    mComputedPadding = spacingToFloatArray(getStylePadding());
+    mComputedPadding = spacingToFloatArray(getPadding());
     markUpdated();
   }
 

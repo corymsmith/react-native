@@ -11,10 +11,10 @@
  */
 'use strict';
 
-var Platform = require('Platform');
 var React = require('React');
 var StyleSheet = require('StyleSheet');
 var { TestModule } = require('NativeModules');
+var UIManager = require('UIManager');
 var View = require('View');
 
 var requireNativeComponent = require('requireNativeComponent');
@@ -38,6 +38,7 @@ var SnapshotViewIOS = React.createClass({
   },
 
   propTypes: {
+    ...View.propTypes,
     // A callback when the Snapshot view is ready to be compared
     onSnapshotReady : React.PropTypes.func,
     // A name to identify the individual instance to the SnapshotView
@@ -51,7 +52,10 @@ var style = StyleSheet.create({
   },
 });
 
-var RCTSnapshot = Platform.OS === 'ios' ?
+// Verify that RCTSnapshot is part of the UIManager since it is only loaded
+// if you have linked against RCTTest like in tests, otherwise we will have
+// a warning printed out
+var RCTSnapshot = UIManager.RCTSnapshot ?
   requireNativeComponent('RCTSnapshot', SnapshotViewIOS) :
   View;
 
